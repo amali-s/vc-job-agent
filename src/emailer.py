@@ -128,7 +128,7 @@ class EmailSender:
             Daily Job Digest
         </h1>
         <p style="color: #666; margin-bottom: 24px; font-size: 14px;">
-            {datetime.now().strftime('%B %d, %Y')} • {len(matches)} matches found
+            {datetime.now().strftime('%B %d, %Y')} &bull; {len(matches)} matches found
         </p>
 
         {job_cards}
@@ -136,7 +136,7 @@ class EmailSender:
         <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
 
         <p style="color: #999; font-size: 12px; text-align: center;">
-            Powered by VC Job Agent • AI-matched product designer opportunities
+            Powered by VC Job Agent &bull; AI-matched product designer opportunities
         </p>
     </div>
 </body>
@@ -147,20 +147,57 @@ class EmailSender:
         """Generate HTML for a single job card."""
         job = match.job
 
-        # Color based on match percentage
+        # Color for match percentage text (no background badge)
         if match.match_percentage >= 80:
-            badge_color = "#10b981"  # Green
+            match_color = "#10b981"  # Green
         elif match.match_percentage >= 70:
-            badge_color = "#3b82f6"  # Blue
+            match_color = "#3b82f6"  # Blue
         else:
-            badge_color = "#f59e0b"  # Amber
+            match_color = "#f59e0b"  # Amber
 
-        skills_html = ""
-        if match.matching_skills:
-            skills_html = f"""
-            <div style="margin-top: 12px;">
-                <span style="color: #666; font-size: 12px;">Matching skills: </span>
-                <span style="color: #10b981; font-size: 12px;">{', '.join(match.matching_skills[:5])}</span>
+        # Company bio section
+        company_bio_html = ""
+        if match.company_bio:
+            company_bio_html = f"""
+            <p style="font-size: 13px; color: #555; margin: 8px 0 4px 0;">
+                {match.company_bio}
+            </p>
+            """
+
+        # Series and posting date metadata line
+        meta_parts = []
+        if match.company_series:
+            meta_parts.append(match.company_series)
+        if job.posted_date:
+            meta_parts.append(f"Posted {job.posted_date.strftime('%b %d, %Y')}")
+        meta_html = ""
+        if meta_parts:
+            meta_html = f"""
+            <p style="font-size: 12px; color: #888; margin: 4px 0;">
+                {' &bull; '.join(meta_parts)}
+            </p>
+            """
+
+        # Salary range
+        salary_html = ""
+        if job.salary_range:
+            salary_html = f"""
+            <p style="font-size: 13px; color: #1a1a1a; margin: 8px 0 4px 0; font-weight: 500;">
+                💰 {job.salary_range}
+            </p>
+            """
+
+        # Matched keywords as inline tags
+        keywords_html = ""
+        if match.matched_keywords:
+            tags = "".join(
+                f'<span style="display: inline-block; background-color: #f0f0f0; color: #555; padding: 2px 8px; border-radius: 4px; font-size: 11px; margin: 2px 4px 2px 0;">{kw}</span>'
+                for kw in match.matched_keywords[:8]
+            )
+            keywords_html = f"""
+            <div style="margin-top: 10px;">
+                <span style="color: #888; font-size: 11px;">Matched: </span>
+                {tags}
             </div>
             """
 
@@ -175,20 +212,19 @@ class EmailSender:
                         {job.company}
                     </p>
                 </div>
-                <span style="background-color: {badge_color}; color: white; padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; white-space: nowrap;">
-                    {match.match_percentage}% match
+                <span style="color: {match_color}; font-size: 16px; font-weight: 700; white-space: nowrap;">
+                    {match.match_percentage}%
                 </span>
             </div>
 
-            <p style="font-size: 13px; color: #888; margin: 8px 0;">
-                📍 {job.location} • 🏢 {job.source}
+            <p style="font-size: 13px; color: #888; margin: 8px 0 4px 0;">
+                📍 {job.location} &bull; 🏢 {job.source}
             </p>
 
-            <p style="font-size: 13px; color: #555; margin: 12px 0;">
-                {match.recommendation}
-            </p>
-
-            {skills_html}
+            {meta_html}
+            {company_bio_html}
+            {salary_html}
+            {keywords_html}
 
             <a href="{job.url}" style="display: inline-block; margin-top: 16px; background-color: #1a1a1a; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
                 Apply Now →

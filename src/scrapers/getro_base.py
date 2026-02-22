@@ -106,7 +106,9 @@ class GetroScraper(BaseScraper):
                 for job_data in jobs_data:
                     job = self._parse_job_json(job_data)
                     if job and self.is_design_job(job.title):
-                        jobs.append(job)
+                        # Apply location and recency filters
+                        if self.is_valid_location(job.location) and self.is_recent_posting(job.posted_date):
+                            jobs.append(job)
 
         except (json.JSONDecodeError, KeyError, TypeError) as e:
             logger.debug(f"[{self.name}] Error parsing __NEXT_DATA__: {e}")
@@ -144,7 +146,9 @@ class GetroScraper(BaseScraper):
                         for job_data in jobs_data:
                             job = self._parse_job_json(job_data)
                             if job and self.is_design_job(job.title):
-                                jobs.append(job)
+                                # Apply location and recency filters
+                                if self.is_valid_location(job.location) and self.is_recent_posting(job.posted_date):
+                                    jobs.append(job)
 
                         if jobs:
                             return jobs
@@ -210,6 +214,12 @@ class GetroScraper(BaseScraper):
             if isinstance(description, dict):
                 description = description.get("text", "") or description.get("html", "")
 
+            # Extract posted date
+            posted_date = self.extract_posted_date(data)
+
+            # Extract salary range
+            salary_range = self.extract_salary(data)
+
             return Job(
                 title=title,
                 company=company,
@@ -218,6 +228,8 @@ class GetroScraper(BaseScraper):
                 description=self.clean_text(str(description))[:5000],
                 source=self.name,
                 scraped_at=datetime.utcnow(),
+                salary_range=salary_range,
+                posted_date=posted_date,
             )
         except Exception as e:
             logger.debug(f"[{self.name}] Error parsing job JSON: {e}")
@@ -275,6 +287,10 @@ class GetroScraper(BaseScraper):
                 location = self.extract_location(
                     location_elem.get_text(strip=True) if location_elem else ""
                 )
+
+                # Apply location filter
+                if not self.is_valid_location(location):
+                    continue
 
                 # Get URL
                 url = elem.get("href") if elem.name == "a" else None

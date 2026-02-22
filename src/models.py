@@ -18,6 +18,7 @@ class Job:
     scraped_at: datetime = field(default_factory=datetime.utcnow)
     remote: bool = False
     salary_range: Optional[str] = None
+    posted_date: Optional[datetime] = None
 
     def __hash__(self):
         return hash((self.title, self.company, self.url))
@@ -38,6 +39,7 @@ class Job:
             "scraped_at": self.scraped_at.isoformat(),
             "remote": self.remote,
             "salary_range": self.salary_range,
+            "posted_date": self.posted_date.isoformat() if self.posted_date else None,
         }
 
 
@@ -50,6 +52,9 @@ class MatchResult:
     matching_skills: list[str] = field(default_factory=list)
     missing_skills: list[str] = field(default_factory=list)
     recommendation: str = ""
+    matched_keywords: list[str] = field(default_factory=list)
+    company_bio: str = ""
+    company_series: str = ""
 
     @property
     def is_good_match(self) -> bool:
@@ -63,6 +68,9 @@ class MatchResult:
             "matching_skills": self.matching_skills,
             "missing_skills": self.missing_skills,
             "recommendation": self.recommendation,
+            "matched_keywords": self.matched_keywords,
+            "company_bio": self.company_bio,
+            "company_series": self.company_series,
         }
 
 
@@ -76,13 +84,63 @@ class CandidateProfile:
     email: str = ""
     skills: list[str] = field(default_factory=list)
 
+    # Structured fields parsed from resume
+    technical_skills: list[str] = field(default_factory=list)
+    strengths: list[str] = field(default_factory=list)
+    soft_skills: list[str] = field(default_factory=list)
+    years_of_experience: str = ""
+    products_worked_on: list[str] = field(default_factory=list)
+    team_types: list[str] = field(default_factory=list)
+    interface_types: list[str] = field(default_factory=list)
+
+    # Structured fields parsed from portfolio
+    problems_solved: list[str] = field(default_factory=list)
+    design_methods: list[str] = field(default_factory=list)
+    visual_skillset: list[str] = field(default_factory=list)
+    goals_motivations: str = ""
+
     @property
     def full_profile(self) -> str:
         """Returns combined profile text for matching."""
-        return f"""
-RESUME:
-{self.resume_text}
+        sections = []
 
-PORTFOLIO:
-{self.portfolio_content}
-""".strip()
+        sections.append("RESUME:\n" + self.resume_text)
+
+        if self.portfolio_content:
+            sections.append("PORTFOLIO:\n" + self.portfolio_content)
+
+        # Append structured data if available
+        structured = self._structured_summary()
+        if structured:
+            sections.append("STRUCTURED PROFILE:\n" + structured)
+
+        return "\n\n".join(sections)
+
+    def _structured_summary(self) -> str:
+        """Generate a structured summary from parsed fields."""
+        parts = []
+
+        if self.technical_skills:
+            parts.append(f"Technical Skills: {', '.join(self.technical_skills)}")
+        if self.strengths:
+            parts.append(f"Strengths: {', '.join(self.strengths)}")
+        if self.soft_skills:
+            parts.append(f"Soft Skills: {', '.join(self.soft_skills)}")
+        if self.years_of_experience:
+            parts.append(f"Years of Experience: {self.years_of_experience}")
+        if self.products_worked_on:
+            parts.append(f"Products Worked On: {', '.join(self.products_worked_on)}")
+        if self.team_types:
+            parts.append(f"Team Types: {', '.join(self.team_types)}")
+        if self.interface_types:
+            parts.append(f"Interface/Experience Types: {', '.join(self.interface_types)}")
+        if self.problems_solved:
+            parts.append(f"Problems Solved: {', '.join(self.problems_solved)}")
+        if self.design_methods:
+            parts.append(f"Design Process & Methods: {', '.join(self.design_methods)}")
+        if self.visual_skillset:
+            parts.append(f"Visual Skillset: {', '.join(self.visual_skillset)}")
+        if self.goals_motivations:
+            parts.append(f"Goals & Motivations: {self.goals_motivations}")
+
+        return "\n".join(parts)

@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 from .scrapers import ALL_SCRAPERS
+from .scrapers.base import BaseScraper
 from .resume_parser import get_profile
 from .matcher import JobMatcher
 from .emailer import send_digest
@@ -54,6 +55,31 @@ def scrape_all_jobs(max_workers: int = 5) -> list[Job]:
     return unique_jobs
 
 
+def filter_jobs(jobs: list[Job]) -> list[Job]:
+    """Apply location and recency filters as a post-scrape safety net.
+
+    Filters jobs to only include those in New York, San Francisco, or Remote,
+    and posted within the last 30 days.
+    """
+    scraper = BaseScraper.__subclasses__()[0]()  # Use any scraper instance for filter methods
+
+    filtered = []
+    for job in jobs:
+        if not scraper.is_valid_location(job.location):
+            logger.debug(f"Filtered out (location): {job.title} at {job.company} — {job.location}")
+            continue
+        if not scraper.is_recent_posting(job.posted_date, max_days=30):
+            logger.debug(f"Filtered out (old posting): {job.title} at {job.company} — {job.posted_date}")
+            continue
+        filtered.append(job)
+
+    removed = len(jobs) - len(filtered)
+    if removed > 0:
+        logger.info(f"Post-scrape filter removed {removed} jobs (location/recency)")
+
+    return filtered
+
+
 def run(dry_run: bool = False, min_match: int = 60) -> int:
     """Run the complete job scanning pipeline.
 
@@ -89,6 +115,16 @@ def run(dry_run: bool = False, min_match: int = 60) -> int:
     if not jobs:
         logger.warning("No jobs found. Check scraper logs for errors.")
         return 0
+
+    # Step 2.5: Apply post-scrape location and recency filters
+    logger.info(f"\n📍 Filtering {len(jobs)} jobs by location (NYC/SF/Remote) and recency (<30 days)...")
+    jobs = filter_jobs(jobs)
+
+    if not jobs:
+        logger.warning("No jobs remaining after location/recency filtering.")
+        return 0
+
+    logger.info(f"{len(jobs)} jobs passed filters")
 
     # Step 3: Match jobs against profile
     logger.info(f"\n🎯 Matching {len(jobs)} jobs against profile...")
@@ -139,6 +175,12 @@ def run(dry_run: bool = False, min_match: int = 60) -> int:
             print(f"  Location: {match.job.location}")
             print(f"  Source: {match.job.source}")
             print(f"  URL: {match.job.url}")
+            if match.company_bio:
+                print(f"  About: {match.company_bio}")
+            if match.job.salary_range:
+                print(f"  Salary: {match.job.salary_range}")
+            if match.matched_keywords:
+                print(f"  Matched: {', '.join(match.matched_keywords)}")
             if match.recommendation:
                 print(f"  Note: {match.recommendation}")
 

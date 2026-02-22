@@ -5,6 +5,7 @@ import logging
 import re
 import time
 from abc import ABC, abstractmethod
+from datetime import datetime, timedelta
 from typing import Optional
 
 import requests
@@ -13,6 +14,20 @@ from bs4 import BeautifulSoup
 from ..models import Job
 
 logger = logging.getLogger(__name__)
+
+
+# Location keywords for New York and San Francisco filtering
+NY_KEYWORDS = [
+    "new york", "nyc", "ny, ", "brooklyn", "manhattan",
+    "new york city", "new york, ny",
+]
+SF_KEYWORDS = [
+    "san francisco", "sf", "bay area", "south bay",
+    "san jose", "palo alto", "mountain view", "menlo park",
+    "sunnyvale", "cupertino", "oakland", "berkeley",
+    "san mateo", "redwood city", "santa clara",
+]
+REMOTE_KEYWORDS = ["remote", "anywhere", "distributed"]
 
 
 class BaseScraper(ABC):
@@ -65,6 +80,123 @@ class BaseScraper(ABC):
         """Check if a job is design-related based on title and description."""
         text = f"{title} {description}".lower()
         return any(keyword in text for keyword in self.DESIGN_KEYWORDS)
+
+    def is_valid_location(self, location: str) -> bool:
+        """Check if job location is in New York, San Francisco, or Remote.
+
+        Returns True if location matches target cities or is remote.
+        Returns True if location is empty/unknown (to avoid filtering out jobs with missing data).
+        """
+        if not location or location == "Not specified":
+            return True  # Don't filter out jobs with unknown location
+
+        loc_lower = location.lower()
+
+        # Check for NY
+        if any(kw in loc_lower for kw in NY_KEYWORDS):
+            return True
+
+        # Check for SF / Bay Area
+        if any(kw in loc_lower for kw in SF_KEYWORDS):
+            return True
+
+        # Check for remote
+        if any(kw in loc_lower for kw in REMOTE_KEYWORDS):
+            return True
+
+        return False
+
+    def is_recent_posting(self, posted_date: Optional[datetime], max_days: int = 30) -> bool:
+        """Check if a job posting is less than max_days old.
+
+        Returns True if the posting is recent or if no date is available.
+        """
+        if posted_date is None:
+            return True  # Don't filter out jobs with unknown date
+
+        cutoff = datetime.utcnow() - timedelta(days=max_days)
+        return posted_date >= cutoff
+
+    def extract_posted_date(self, data: dict) -> Optional[datetime]:
+        """Extract posted date from common job data fields."""
+        date_fields = [
+            "createdAt", "created_at", "publishedAt", "published_at",
+            "postedAt", "posted_at", "datePosted", "date_posted",
+            "listDate", "list_date", "postDate", "post_date",
+        ]
+
+        for field in date_fields:
+            value = data.get(field)
+            if not value:
+                continue
+
+            if isinstance(value, (int, float)):
+                # Unix timestamp (seconds or milliseconds)
+                try:
+                    if value > 1e12:
+                        return datetime.utcfromtimestamp(value / 1000)
+                    return datetime.utcfromtimestamp(value)
+                except (ValueError, OSError):
+                    continue
+
+            if isinstance(value, str):
+                # Try common date formats
+                for fmt in [
+                    "%Y-%m-%dT%H:%M:%S.%fZ",
+                    "%Y-%m-%dT%H:%M:%SZ",
+                    "%Y-%m-%dT%H:%M:%S",
+                    "%Y-%m-%d",
+                    "%m/%d/%Y",
+                    "%B %d, %Y",
+                ]:
+                    try:
+                        return datetime.strptime(value.strip(), fmt)
+                    except ValueError:
+                        continue
+
+                # Try dateutil as fallback
+                try:
+                    from dateutil import parser as dateutil_parser
+                    return dateutil_parser.parse(value)
+                except Exception:
+                    continue
+
+        return None
+
+    def extract_salary(self, data: dict) -> Optional[str]:
+        """Extract salary range from job data if present."""
+        salary_fields = [
+            "salary", "salaryRange", "salary_range", "compensation",
+            "pay", "payRange", "pay_range", "salaryMin", "salaryMax",
+        ]
+
+        for field in salary_fields:
+            value = data.get(field)
+            if not value:
+                continue
+
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            elif isinstance(value, dict):
+                min_val = value.get("min") or value.get("minimum") or value.get("from")
+                max_val = value.get("max") or value.get("maximum") or value.get("to")
+                currency = value.get("currency", "USD")
+                if min_val and max_val:
+                    return f"${min_val:,} - ${max_val:,} {currency}"
+                elif min_val:
+                    return f"${min_val:,}+ {currency}"
+                elif max_val:
+                    return f"Up to ${max_val:,} {currency}"
+
+        # Check for salary in min/max separate fields
+        min_salary = data.get("salaryMin") or data.get("salary_min") or data.get("compensationMin")
+        max_salary = data.get("salaryMax") or data.get("salary_max") or data.get("compensationMax")
+        if min_salary and max_salary:
+            return f"${min_salary:,} - ${max_salary:,}"
+        elif min_salary:
+            return f"${min_salary:,}+"
+
+        return None
 
     def fetch_page(self, url: str, delay: float = 1.0) -> Optional[BeautifulSoup]:
         """Fetch a page and return BeautifulSoup object."""

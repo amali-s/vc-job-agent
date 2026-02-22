@@ -1,5 +1,6 @@
-"""Resume and portfolio parser."""
+"""Resume and portfolio parser with structured extraction."""
 
+import json
 import logging
 import os
 from pathlib import Path
@@ -11,6 +12,42 @@ from bs4 import BeautifulSoup
 from .models import CandidateProfile
 
 logger = logging.getLogger(__name__)
+
+# Prompt for structured resume extraction
+RESUME_EXTRACTION_PROMPT = """Analyze this resume and extract structured information. Return a JSON object with these fields:
+
+{{
+    "technical_skills": ["list of technical/design tools and hard skills, e.g. Figma, Sketch, Prototyping, HTML/CSS"],
+    "strengths": ["list of professional strengths, e.g. Design Systems, User Research, Cross-functional Leadership"],
+    "soft_skills": ["list of soft skills, e.g. Communication, Collaboration, Mentoring, Stakeholder Management"],
+    "years_of_experience": "total years of professional design experience as a string, e.g. '5 years'",
+    "products_worked_on": ["list of product types, e.g. SaaS B2B, Consumer Mobile App, E-commerce Platform"],
+    "team_types": ["list of team types worked in, e.g. Cross-functional product team, Design team of 5, Startup founding team"],
+    "interface_types": ["list of interface/experience types designed, e.g. Web dashboard, Mobile app, Design system, Data visualization"]
+}}
+
+Be thorough — extract everything relevant. Only return the JSON, no other text.
+
+RESUME TEXT:
+{text}"""
+
+# Prompt for structured portfolio extraction
+PORTFOLIO_EXTRACTION_PROMPT = """Analyze this portfolio website content and extract structured information. Return a JSON object with these fields:
+
+{{
+    "years_of_experience": "years of experience mentioned or inferred, e.g. '6 years'",
+    "products_worked_on": ["list of product types shown in portfolio, e.g. SaaS Platform, Mobile App, Website Redesign"],
+    "problems_solved": ["list of problem types from case studies, e.g. Improved onboarding conversion, Reduced user churn, Simplified complex workflow"],
+    "design_methods": ["list of design processes and methods, e.g. User interviews, A/B testing, Design sprints, Usability testing, Journey mapping"],
+    "team_types": ["list of team types collaborated with, e.g. Engineering team, Product managers, Data science, Marketing"],
+    "visual_skillset": ["list of visual design skills, e.g. Typography, Illustration, Motion design, Brand identity, Icon design"],
+    "goals_motivations": "goals and motivations from about/bio section, as a short summary string"
+}}
+
+Be thorough — extract everything relevant from case studies and about sections. Only return the JSON, no other text.
+
+PORTFOLIO CONTENT:
+{text}"""
 
 
 class ResumeParser:
@@ -33,10 +70,16 @@ class ResumeParser:
         resume_text = self._parse_resume()
         portfolio_content = self._scrape_portfolio()
 
-        return CandidateProfile(
+        profile = CandidateProfile(
             resume_text=resume_text,
             portfolio_content=portfolio_content,
         )
+
+        # Extract structured data using LLM
+        self._extract_structured_resume(profile)
+        self._extract_structured_portfolio(profile)
+
+        return profile
 
     def _parse_resume(self) -> str:
         """Extract text from resume PDF."""
@@ -110,6 +153,117 @@ class ResumeParser:
         except Exception as e:
             logger.error(f"Error parsing portfolio HTML: {e}")
             return ""
+
+    def _extract_structured_resume(self, profile: CandidateProfile) -> None:
+        """Use LLM to extract structured data from resume text."""
+        if not profile.resume_text:
+            return
+
+        try:
+            result = self._call_llm(
+                RESUME_EXTRACTION_PROMPT.format(text=profile.resume_text[:8000])
+            )
+            if not result:
+                return
+
+            data = json.loads(self._clean_json(result))
+            profile.technical_skills = data.get("technical_skills", [])
+            profile.strengths = data.get("strengths", [])
+            profile.soft_skills = data.get("soft_skills", [])
+            profile.years_of_experience = data.get("years_of_experience", "")
+            profile.products_worked_on = data.get("products_worked_on", [])
+            profile.team_types = data.get("team_types", [])
+            profile.interface_types = data.get("interface_types", [])
+            logger.info("Extracted structured resume data successfully")
+
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            logger.warning(f"Could not extract structured resume data: {e}")
+        except Exception as e:
+            logger.warning(f"LLM extraction failed for resume: {e}")
+
+    def _extract_structured_portfolio(self, profile: CandidateProfile) -> None:
+        """Use LLM to extract structured data from portfolio content."""
+        if not profile.portfolio_content:
+            return
+
+        try:
+            result = self._call_llm(
+                PORTFOLIO_EXTRACTION_PROMPT.format(text=profile.portfolio_content[:8000])
+            )
+            if not result:
+                return
+
+            data = json.loads(self._clean_json(result))
+
+            # Merge years of experience (prefer resume, fallback to portfolio)
+            if not profile.years_of_experience:
+                profile.years_of_experience = data.get("years_of_experience", "")
+
+            # Extend product types (deduplicate)
+            portfolio_products = data.get("products_worked_on", [])
+            existing = set(p.lower() for p in profile.products_worked_on)
+            for p in portfolio_products:
+                if p.lower() not in existing:
+                    profile.products_worked_on.append(p)
+                    existing.add(p.lower())
+
+            # Extend team types
+            portfolio_teams = data.get("team_types", [])
+            existing_teams = set(t.lower() for t in profile.team_types)
+            for t in portfolio_teams:
+                if t.lower() not in existing_teams:
+                    profile.team_types.append(t)
+                    existing_teams.add(t.lower())
+
+            profile.problems_solved = data.get("problems_solved", [])
+            profile.design_methods = data.get("design_methods", [])
+            profile.visual_skillset = data.get("visual_skillset", [])
+            profile.goals_motivations = data.get("goals_motivations", "")
+            logger.info("Extracted structured portfolio data successfully")
+
+        except (json.JSONDecodeError, KeyError, TypeError) as e:
+            logger.warning(f"Could not extract structured portfolio data: {e}")
+        except Exception as e:
+            logger.warning(f"LLM extraction failed for portfolio: {e}")
+
+    def _call_llm(self, prompt: str) -> Optional[str]:
+        """Call available LLM API for structured extraction."""
+        openai_key = os.environ.get("OPENAI_API_KEY")
+        anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
+
+        if openai_key:
+            import openai
+            client = openai.OpenAI(api_key=openai_key)
+            response = client.chat.completions.create(
+                model="gpt-4o",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=2048,
+                response_format={"type": "json_object"},
+            )
+            return response.choices[0].message.content.strip()
+
+        elif anthropic_key:
+            import anthropic
+            client = anthropic.Anthropic(api_key=anthropic_key)
+            message = client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=2048,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return message.content[0].text.strip()
+
+        else:
+            logger.warning("No API key available for structured extraction — skipping")
+            return None
+
+    def _clean_json(self, text: str) -> str:
+        """Clean potential markdown code blocks from JSON response."""
+        if text.startswith("```"):
+            text = text.split("```")[1]
+            if text.startswith("json"):
+                text = text[4:]
+            text = text.strip()
+        return text
 
 
 def get_profile() -> CandidateProfile:

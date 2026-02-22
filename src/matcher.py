@@ -24,17 +24,26 @@ Company: {company}
 Location: {location}
 Description: {description}
 
-Evaluate the match based on:
-1. Skills alignment (design tools, methodologies, technical skills)
-2. Experience level match
-3. Industry/domain fit
-4. Location compatibility (consider remote-friendly roles)
+Evaluate the match based on these dimensions:
+1. Skills & strengths required — Does the candidate have the technical skills, design tools, and strengths the job asks for?
+2. Years of experience & what they worked on — Does the candidate's experience level and the types of products they've built align with what the role needs?
+3. Who they worked with — Does the candidate have experience in the types of teams this role involves (cross-functional, engineering, data science, etc.)?
+4. Who they worked for — Does the candidate's industry/company experience align (startups, enterprise, B2B, consumer, etc.)?
+5. Results achieved — Do the candidate's project outcomes and problem-solving experience match what this role is looking for?
+
+Also extract:
+- A 1-2 sentence company bio from the job description (what the company does, its mission)
+- The company's funding series if mentioned (e.g. "Series A", "Series B", "Series C", "Public")
+- Specific words or short descriptions from the job posting that matched the candidate's profile
 
 Return a JSON response with this exact structure:
 {{
     "match_percentage": <0-100 integer>,
     "matching_skills": ["skill1", "skill2", ...],
     "missing_skills": ["skill1", "skill2", ...],
+    "matched_keywords": ["keyword or phrase from job posting that matched", ...],
+    "company_bio": "<1-2 sentence description of what the company does>",
+    "company_series": "<funding series if mentioned, e.g. Series B, or empty string if not found>",
     "recommendation": "<2-3 sentence explanation of the match>"
 }}
 
@@ -86,6 +95,9 @@ Only return the JSON, no other text."""
                 matching_skills=result.get("matching_skills", []),
                 missing_skills=result.get("missing_skills", []),
                 recommendation=result.get("recommendation", ""),
+                matched_keywords=result.get("matched_keywords", []),
+                company_bio=result.get("company_bio", ""),
+                company_series=result.get("company_series", ""),
             )
 
         except json.JSONDecodeError as e:
