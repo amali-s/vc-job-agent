@@ -55,6 +55,45 @@ def scrape_all_jobs(max_workers: int = 5) -> list[Job]:
     return unique_jobs
 
 
+def enhance_jobs_with_details(jobs: list[Job], max_workers: int = 5) -> list[Job]:
+    """Fetch full descriptions from job detail pages in parallel.
+
+    Enhances jobs that have short or missing descriptions by following
+    their URLs to scrape the complete job posting content.
+    """
+    if not jobs:
+        return jobs
+
+    logger.info(f"Fetching detail pages for {len(jobs)} jobs...")
+
+    # Use a BaseScraper instance for the fetch method
+    scraper = BaseScraper.__subclasses__()[0]()
+    enhanced_count = 0
+
+    # Record original description lengths before enhancement
+    original_lengths = {id(job): len(job.description) for job in jobs}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_job = {
+            executor.submit(scraper.fetch_job_detail, job): job for job in jobs
+        }
+
+        results = []
+        for future in as_completed(future_to_job):
+            original = future_to_job[future]
+            try:
+                updated = future.result()
+                if len(updated.description) > original_lengths.get(id(original), 0):
+                    enhanced_count += 1
+                results.append(updated)
+            except Exception as e:
+                logger.debug(f"Detail fetch failed for {original.title}: {e}")
+                results.append(original)
+
+    logger.info(f"Enhanced {enhanced_count}/{len(jobs)} jobs with full descriptions")
+    return results
+
+
 def filter_jobs(jobs: list[Job]) -> list[Job]:
     """Apply location and recency filters as a post-scrape safety net.
 
@@ -80,12 +119,13 @@ def filter_jobs(jobs: list[Job]) -> list[Job]:
     return filtered
 
 
-def run(dry_run: bool = False, min_match: int = 60) -> int:
+def run(dry_run: bool = False, min_match: int = 60, skip_details: bool = False) -> int:
     """Run the complete job scanning pipeline.
 
     Args:
         dry_run: If True, skip sending email
         min_match: Minimum match percentage to include (default 60%)
+        skip_details: If True, skip fetching full descriptions from detail pages
 
     Returns:
         Number of matching jobs found
@@ -125,6 +165,13 @@ def run(dry_run: bool = False, min_match: int = 60) -> int:
         return 0
 
     logger.info(f"{len(jobs)} jobs passed filters")
+
+    # Step 2.75: Enhance jobs with full descriptions from detail pages
+    if not skip_details:
+        logger.info(f"\n📝 Fetching full job descriptions from detail pages...")
+        jobs = enhance_jobs_with_details(jobs)
+    else:
+        logger.info("Skipping detail page fetching (--skip-details)")
 
     # Step 3: Match jobs against profile
     logger.info(f"\n🎯 Matching {len(jobs)} jobs against profile...")
@@ -215,6 +262,11 @@ def main():
         help="Minimum match percentage (default: 60)",
     )
     parser.add_argument(
+        "--skip-details",
+        action="store_true",
+        help="Skip fetching full descriptions from job detail pages",
+    )
+    parser.add_argument(
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose logging",
@@ -226,7 +278,7 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
 
     try:
-        matches = run(dry_run=args.dry_run, min_match=args.min_match)
+        matches = run(dry_run=args.dry_run, min_match=args.min_match, skip_details=args.skip_details)
         sys.exit(0 if matches >= 0 else 1)
     except KeyboardInterrupt:
         logger.info("\nInterrupted by user")

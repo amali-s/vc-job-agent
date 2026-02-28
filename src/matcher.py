@@ -22,17 +22,25 @@ JOB POSTING:
 Title: {title}
 Company: {company}
 Location: {location}
-Description: {description}
+Company Description: {company_description}
+Qualifications/Requirements: {qualifications}
+Full Description: {description}
+
+MATCHING INSTRUCTIONS:
+Prioritize the Qualifications/Requirements section above all else when evaluating fit.
+This is the most reliable signal for what the role actually needs.
+Use the Full Description for additional context on responsibilities and team.
+Use the Company Description to assess industry and culture fit.
 
 Evaluate the match based on these dimensions:
-1. Skills & strengths required — Does the candidate have the technical skills, design tools, and strengths the job asks for?
-2. Years of experience & what they worked on — Does the candidate's experience level and the types of products they've built align with what the role needs?
+1. Skills & strengths required — Does the candidate have the technical skills, design tools, and strengths listed in the qualifications?
+2. Years of experience & what they worked on — Does the candidate's experience level and the types of products they've built align with the stated requirements?
 3. Who they worked with — Does the candidate have experience in the types of teams this role involves (cross-functional, engineering, data science, etc.)?
 4. Who they worked for — Does the candidate's industry/company experience align (startups, enterprise, B2B, consumer, etc.)?
 5. Results achieved — Do the candidate's project outcomes and problem-solving experience match what this role is looking for?
 
 Also extract:
-- A 1-2 sentence company bio from the job description (what the company does, its mission)
+- A 1-2 sentence company bio: use the Company Description field if provided, otherwise infer from the job description (what the company does, its mission)
 - The company's funding series if mentioned (e.g. "Series A", "Series B", "Series C", "Public")
 - Specific words or short descriptions from the job posting that matched the candidate's profile
 
@@ -77,7 +85,9 @@ Only return the JSON, no other text."""
                 title=job.title,
                 company=job.company,
                 location=job.location,
-                description=job.description[:5000],
+                company_description=job.company_description[:2000] if job.company_description else "Not available",
+                qualifications=job.qualifications[:4000] if job.qualifications else "Not available — refer to Full Description",
+                description=job.description[:8000],
             )
 
             if self.provider == "openai":

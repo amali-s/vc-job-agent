@@ -19,6 +19,8 @@ class Job:
     remote: bool = False
     salary_range: Optional[str] = None
     posted_date: Optional[datetime] = None
+    qualifications: str = ""  # Extracted from Qualifications/Requirements section
+    company_description: str = ""  # Company bio from top of job posting
 
     def __hash__(self):
         return hash((self.title, self.company, self.url))
@@ -40,6 +42,8 @@ class Job:
             "remote": self.remote,
             "salary_range": self.salary_range,
             "posted_date": self.posted_date.isoformat() if self.posted_date else None,
+            "qualifications": self.qualifications,
+            "company_description": self.company_description,
         }
 
 

@@ -225,7 +225,7 @@ class GetroScraper(BaseScraper):
                 company=company,
                 location=self.extract_location(location) if location else "Not specified",
                 url=url,
-                description=self.clean_text(str(description))[:5000],
+                description=self.clean_text(str(description))[:8000],
                 source=self.name,
                 scraped_at=datetime.utcnow(),
                 salary_range=salary_range,

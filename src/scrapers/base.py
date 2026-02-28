@@ -278,6 +278,218 @@ class BaseScraper(ABC):
             return text
         return text
 
+    # Section headings that indicate qualifications/requirements content
+    QUALIFICATIONS_HEADINGS = [
+        "qualifications", "requirements", "what you'll need", "what we're looking for",
+        "who you are", "what you bring", "must have", "minimum qualifications",
+        "preferred qualifications", "basic qualifications", "required skills",
+        "skills & experience", "skills and experience", "you should have",
+        "you have", "about you", "ideal candidate", "what we expect",
+    ]
+
+    # Section headings that indicate the end of a qualifications block
+    SECTION_END_HEADINGS = [
+        "responsibilities", "what you'll do", "the role", "about the role",
+        "benefits", "perks", "compensation", "how to apply", "nice to have",
+        "bonus", "about us", "about the team", "our stack", "tech stack",
+        "equal opportunity", "eeo",
+    ]
+
+    def fetch_job_detail(self, job: 'Job') -> 'Job':
+        """Fetch the full job description from the detail page.
+
+        Follows the job URL to extract:
+        - Full description text
+        - Qualifications/Requirements section (prioritized for matching)
+        - Company description from the top of the posting
+
+        Returns the job with updated fields (or unchanged on failure).
+        """
+        # Skip if URL is just the listing page or missing
+        if not job.url or job.url == getattr(self, 'jobs_url', ''):
+            return job
+
+        try:
+            soup = self.fetch_page(job.url, delay=0.3)
+            if not soup:
+                return job
+
+            # Remove non-content elements
+            for tag in soup.find_all(["script", "style", "nav", "header", "footer", "noscript"]):
+                tag.decompose()
+
+            # Try job-specific selectors first (most specific → least specific)
+            detail_selectors = [
+                ".job-description",
+                "[class*='description']",
+                "[class*='Description']",
+                "[class*='job-detail']",
+                "[class*='JobDetail']",
+                "[class*='job-content']",
+                "[class*='posting-']",
+                "[class*='content']",
+                "article",
+                "main",
+                "[role='main']",
+            ]
+
+            content_elem = None
+            for selector in detail_selectors:
+                elem = soup.select_one(selector)
+                if elem and len(elem.get_text(strip=True)) > 200:
+                    content_elem = elem
+                    break
+
+            # Fallback: use body
+            if not content_elem:
+                content_elem = soup.find("body")
+
+            if not content_elem:
+                return job
+
+            detail_text = content_elem.get_text(separator="\n", strip=True)
+            if not detail_text:
+                return job
+
+            # --- Extract company description from top of posting ---
+            company_desc = self._extract_company_description(content_elem)
+            if company_desc:
+                job.company_description = company_desc[:2000]
+
+            # --- Extract qualifications/requirements section ---
+            qualifications = self._extract_qualifications(content_elem, detail_text)
+            if qualifications:
+                job.qualifications = qualifications[:4000]
+
+            # --- Update full description ---
+            detail_text_clean = self.clean_text(detail_text)
+            if len(detail_text_clean) > len(job.description):
+                job.description = detail_text_clean[:8000]
+                logger.debug(f"[{self.name}] Enhanced description for: {job.title} ({len(detail_text_clean)} chars)")
+
+            # Try to extract salary from detail page if we don't have one
+            if not job.salary_range:
+                salary_match = re.search(
+                    r'\$[\d,]+(?:\s*[-–—]\s*\$[\d,]+)?(?:\s*(?:per year|/yr|/year|annually))?',
+                    detail_text_clean
+                )
+                if salary_match:
+                    job.salary_range = salary_match.group(0)
+
+        except Exception as e:
+            logger.debug(f"[{self.name}] Failed to fetch detail for {job.title}: {e}")
+
+        return job
+
+    def _extract_company_description(self, content_elem) -> str:
+        """Extract company description from the top of the job posting.
+
+        Typically the first paragraph(s) before any section headings describe
+        the company and its mission.
+        """
+        paragraphs = []
+        all_headings = set(self.QUALIFICATIONS_HEADINGS + self.SECTION_END_HEADINGS)
+
+        for child in content_elem.children:
+            text = ""
+            if hasattr(child, 'get_text'):
+                text = child.get_text(strip=True)
+            elif isinstance(child, str):
+                text = child.strip()
+
+            if not text:
+                continue
+
+            text_lower = text.lower()
+
+            # Stop when we hit a known section heading
+            if any(heading in text_lower for heading in all_headings):
+                break
+
+            # Also stop at heading tags that look like section breaks
+            if hasattr(child, 'name') and child.name in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+                # If it's a short heading (not the job title), treat as section start
+                if len(text) < 100 and len(paragraphs) > 0:
+                    break
+
+            # Collect paragraph-length text (skip very short fragments)
+            if len(text) > 40:
+                paragraphs.append(text)
+
+            # Cap at ~3 paragraphs for company description
+            if len(paragraphs) >= 3:
+                break
+
+        return self.clean_text("\n".join(paragraphs))
+
+    def _extract_qualifications(self, content_elem, full_text: str) -> str:
+        """Extract the qualifications/requirements section from the job posting.
+
+        Uses two strategies:
+        1. DOM-based: Find heading elements that match qualification keywords,
+           then collect all sibling content until the next section heading.
+        2. Text-based: Split full text by lines and capture content between
+           qualification headings and the next section heading.
+        """
+        # Strategy 1: DOM-based extraction using heading elements
+        headings = content_elem.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'strong', 'b'])
+        for heading in headings:
+            heading_text = heading.get_text(strip=True).lower()
+            if not any(q in heading_text for q in self.QUALIFICATIONS_HEADINGS):
+                continue
+
+            # Found a qualifications heading — collect following content
+            sections = []
+            sibling = heading.find_next_sibling()
+            while sibling:
+                sib_text = sibling.get_text(strip=True)
+                sib_lower = sib_text.lower()
+
+                # Stop at the next major section heading
+                if sibling.name in ('h1', 'h2', 'h3', 'h4', 'h5', 'h6'):
+                    if any(end in sib_lower for end in self.SECTION_END_HEADINGS):
+                        break
+                    # Also stop at a new qualifications-type heading (e.g. "Preferred Qualifications")
+                    # but only if we already have content
+                    if sections and any(q in sib_lower for q in self.QUALIFICATIONS_HEADINGS):
+                        # Include this sub-section too by continuing
+                        pass
+                    elif sections:
+                        break
+
+                if sib_text:
+                    sections.append(sib_text)
+
+                sibling = sibling.find_next_sibling()
+
+            if sections:
+                return self.clean_text("\n".join(sections))
+
+        # Strategy 2: Text-based fallback using line splitting
+        lines = full_text.split("\n")
+        capture = False
+        captured = []
+
+        for line in lines:
+            line_stripped = line.strip()
+            line_lower = line_stripped.lower()
+
+            if any(q in line_lower for q in self.QUALIFICATIONS_HEADINGS):
+                capture = True
+                continue
+
+            if capture:
+                # Stop at end-of-section headings
+                if any(end in line_lower for end in self.SECTION_END_HEADINGS):
+                    break
+                if line_stripped:
+                    captured.append(line_stripped)
+
+        if captured:
+            return self.clean_text("\n".join(captured))
+
+        return ""
+
     def log_found(self, count: int):
         """Log number of jobs found."""
         logger.info(f"[{self.name}] Found {count} design jobs")

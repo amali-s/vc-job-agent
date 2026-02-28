@@ -53,6 +53,15 @@ PORTFOLIO CONTENT:
 class ResumeParser:
     """Parser for extracting profile information from resume PDF and portfolio website."""
 
+    # Portfolio subpages to scrape for design process and work experience
+    PORTFOLIO_SUBPAGES = [
+        "/about-me",
+        "/trial",
+        "/dns-feature",
+        "/cloud-details",
+        "/gantt-chart",
+    ]
+
     def __init__(
         self,
         resume_path: Optional[str] = None,
@@ -110,49 +119,67 @@ class ResumeParser:
             return ""
 
     def _scrape_portfolio(self) -> str:
-        """Scrape portfolio website for additional profile information."""
+        """Scrape portfolio website and case study subpages for profile information.
+
+        Fetches the main portfolio URL plus all configured subpages (about, case studies)
+        to build a complete picture of the candidate's design process and work experience.
+        """
         if not self.portfolio_url:
             return ""
 
-        try:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
-            }
-            response = requests.get(self.portfolio_url, headers=headers, timeout=30)
-            response.raise_for_status()
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+        }
 
-            soup = BeautifulSoup(response.text, "lxml")
+        # Build full list of URLs: main page + subpages
+        base_url = self.portfolio_url.rstrip("/")
+        urls_to_scrape = [self.portfolio_url]
+        for subpage in self.PORTFOLIO_SUBPAGES:
+            urls_to_scrape.append(f"{base_url}{subpage}")
 
-            # Remove script and style elements
-            for script in soup(["script", "style", "nav", "footer", "header"]):
-                script.decompose()
+        all_sections = []
 
-            # Extract text content
-            text = soup.get_text(separator="\n", strip=True)
+        for url in urls_to_scrape:
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                response.raise_for_status()
 
-            # Clean up whitespace
-            lines = [line.strip() for line in text.split("\n") if line.strip()]
-            text = "\n".join(lines)
+                soup = BeautifulSoup(response.text, "lxml")
 
-            # Also try to get project descriptions from common portfolio sections
-            projects = []
-            for section in soup.select(".project, .work, .case-study, [class*='project']"):
-                project_text = section.get_text(separator=" ", strip=True)
-                if project_text:
-                    projects.append(project_text)
+                # Remove script and style elements
+                for script in soup(["script", "style", "nav", "footer", "header"]):
+                    script.decompose()
 
-            if projects:
-                text += "\n\nPROJECTS:\n" + "\n---\n".join(projects[:10])
+                # Extract text content
+                page_text = soup.get_text(separator="\n", strip=True)
+                lines = [line.strip() for line in page_text.split("\n") if line.strip()]
+                page_text = "\n".join(lines)
 
-            logger.info(f"Scraped {len(text)} characters from portfolio")
-            return text[:20000]  # Limit portfolio content
+                if not page_text:
+                    continue
 
-        except requests.RequestException as e:
-            logger.error(f"Error scraping portfolio: {e}")
-            return ""
-        except Exception as e:
-            logger.error(f"Error parsing portfolio HTML: {e}")
-            return ""
+                # Label each page's content by its source
+                page_label = url.replace(base_url, "").strip("/") or "home"
+                all_sections.append(f"[PAGE: {page_label}]\n{page_text}")
+
+                # Also try to get project descriptions from common portfolio sections
+                for section in soup.select(".project, .work, .case-study, [class*='project']"):
+                    project_text = section.get_text(separator=" ", strip=True)
+                    if project_text:
+                        all_sections.append(f"[PROJECT from {page_label}]\n{project_text}")
+
+                logger.info(f"Scraped {len(page_text)} characters from {page_label}")
+
+            except requests.RequestException as e:
+                logger.warning(f"Could not fetch portfolio page {url}: {e}")
+                continue
+            except Exception as e:
+                logger.warning(f"Error parsing portfolio page {url}: {e}")
+                continue
+
+        combined = "\n\n---\n\n".join(all_sections)
+        logger.info(f"Total portfolio content: {len(combined)} characters from {len(all_sections)} sections")
+        return combined[:30000]  # Increased limit for multiple pages
 
     def _extract_structured_resume(self, profile: CandidateProfile) -> None:
         """Use LLM to extract structured data from resume text."""
@@ -188,7 +215,7 @@ class ResumeParser:
 
         try:
             result = self._call_llm(
-                PORTFOLIO_EXTRACTION_PROMPT.format(text=profile.portfolio_content[:8000])
+                PORTFOLIO_EXTRACTION_PROMPT.format(text=profile.portfolio_content[:15000])
             )
             if not result:
                 return
