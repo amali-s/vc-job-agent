@@ -8,7 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from typing import Optional
 
-from .models import MatchResult
+from .models import MatchResult, ScrapeSummary
 
 logger = logging.getLogger(__name__)
 
@@ -43,14 +43,19 @@ class EmailSender:
                 "or SENDGRID_API_KEY + EMAIL_FROM"
             )
 
-    def send_daily_digest(self, matches: list[MatchResult], dry_run: bool = False) -> bool:
+    def send_daily_digest(
+        self,
+        matches: list[MatchResult],
+        scrape_summaries: list[ScrapeSummary] | None = None,
+        dry_run: bool = False,
+    ) -> bool:
         """Send daily job digest email."""
         if not matches:
             logger.info("No matches to send")
             return True
 
         subject = f"🎯 {len(matches)} Product Designer Jobs - {datetime.now().strftime('%b %d, %Y')}"
-        html_content = self._generate_html(matches)
+        html_content = self._generate_html(matches, scrape_summaries)
 
         if dry_run:
             logger.info(f"DRY RUN: Would send email to {self.to_email}")
@@ -110,9 +115,14 @@ class EmailSender:
             logger.error(f"SendGrid error: {e}")
             return False
 
-    def _generate_html(self, matches: list[MatchResult]) -> str:
+    def _generate_html(
+        self,
+        matches: list[MatchResult],
+        scrape_summaries: list[ScrapeSummary] | None = None,
+    ) -> str:
         """Generate HTML email content."""
         job_cards = "\n".join(self._generate_job_card(m) for m in matches)
+        summary_html = self._generate_scrape_summary_html(scrape_summaries) if scrape_summaries else ""
 
         return f"""
 <!DOCTYPE html>
@@ -133,6 +143,8 @@ class EmailSender:
 
         {job_cards}
 
+        {summary_html}
+
         <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0;">
 
         <p style="color: #999; font-size: 12px; text-align: center;">
@@ -142,6 +154,26 @@ class EmailSender:
 </body>
 </html>
 """
+
+    def _format_rank_delta(self, delta: int | None) -> str:
+        """Format rank delta for email display."""
+        if delta is None:
+            return '<span style="color: #8b5cf6; font-size: 11px;">NEW</span>'
+        if delta > 0:
+            return f'<span style="color: #10b981; font-size: 11px;">↑{delta}</span>'
+        if delta < 0:
+            return f'<span style="color: #ef4444; font-size: 11px;">↓{abs(delta)}</span>'
+        return '<span style="color: #888; font-size: 11px;">—</span>'
+
+    def _format_match_delta(self, delta: int | None) -> str:
+        """Format match % delta for email display."""
+        if delta is None:
+            return ""
+        if delta > 0:
+            return f' <span style="color: #10b981; font-size: 11px;">↑{delta}%</span>'
+        if delta < 0:
+            return f' <span style="color: #ef4444; font-size: 11px;">↓{abs(delta)}%</span>'
+        return ""
 
     def _generate_job_card(self, match: MatchResult) -> str:
         """Generate HTML for a single job card."""
@@ -154,6 +186,17 @@ class EmailSender:
             match_color = "#3b82f6"  # Blue
         else:
             match_color = "#f59e0b"  # Amber
+
+        # Rank and delta line
+        rank_html = ""
+        if match.rank > 0:
+            rank_delta_str = self._format_rank_delta(match.rank_delta)
+            match_delta_str = self._format_match_delta(match.match_delta)
+            rank_html = f"""
+            <p style="font-size: 12px; color: #888; margin: 4px 0 0 0;">
+                Rank: #{match.rank} {rank_delta_str} &bull; Match: {match.match_percentage}%{match_delta_str}
+            </p>
+            """
 
         # Company bio section
         company_bio_html = ""
@@ -217,6 +260,8 @@ class EmailSender:
                 </span>
             </div>
 
+            {rank_html}
+
             <p style="font-size: 13px; color: #888; margin: 8px 0 4px 0;">
                 📍 {job.location} &bull; 🏢 {job.source}
             </p>
@@ -232,8 +277,60 @@ class EmailSender:
         </div>
         """
 
+    def _generate_scrape_summary_html(self, summaries: list[ScrapeSummary]) -> str:
+        """Generate HTML table for per-source scrape summary (Task 4)."""
+        if not summaries:
+            return ""
 
-def send_digest(matches: list[MatchResult], dry_run: bool = False) -> bool:
+        total_all = sum(s.total for s in summaries)
+        new_all = sum(s.new for s in summaries)
+        seen_all = sum(s.previously_seen for s in summaries)
+
+        rows = ""
+        for s in summaries:
+            rows += f"""
+            <tr>
+                <td style="padding: 6px 10px; font-size: 12px; color: #555; border-bottom: 1px solid #f0f0f0;">{s.source}</td>
+                <td style="padding: 6px 10px; font-size: 12px; color: #555; border-bottom: 1px solid #f0f0f0; text-align: center;">{s.total}</td>
+                <td style="padding: 6px 10px; font-size: 12px; color: #10b981; border-bottom: 1px solid #f0f0f0; text-align: center; font-weight: 600;">{s.new}</td>
+                <td style="padding: 6px 10px; font-size: 12px; color: #888; border-bottom: 1px solid #f0f0f0; text-align: center;">{s.previously_seen}</td>
+            </tr>
+            """
+
+        return f"""
+        <hr style="border: none; border-top: 1px solid #eee; margin: 32px 0 24px 0;">
+
+        <h3 style="font-size: 14px; font-weight: 600; color: #1a1a1a; margin-bottom: 12px;">
+            Scrape Summary
+        </h3>
+
+        <table style="width: 100%; border-collapse: collapse; font-family: -apple-system, BlinkMacSystemFont, sans-serif;">
+            <thead>
+                <tr style="background-color: #fafafa;">
+                    <th style="padding: 8px 10px; font-size: 11px; color: #888; text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Source</th>
+                    <th style="padding: 8px 10px; font-size: 11px; color: #888; text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Total</th>
+                    <th style="padding: 8px 10px; font-size: 11px; color: #888; text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">New</th>
+                    <th style="padding: 8px 10px; font-size: 11px; color: #888; text-align: center; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Seen</th>
+                </tr>
+            </thead>
+            <tbody>
+                {rows}
+                <tr style="background-color: #fafafa; font-weight: 600;">
+                    <td style="padding: 8px 10px; font-size: 12px; color: #1a1a1a;">Total</td>
+                    <td style="padding: 8px 10px; font-size: 12px; color: #1a1a1a; text-align: center;">{total_all}</td>
+                    <td style="padding: 8px 10px; font-size: 12px; color: #10b981; text-align: center;">{new_all}</td>
+                    <td style="padding: 8px 10px; font-size: 12px; color: #888; text-align: center;">{seen_all}</td>
+                </tr>
+            </tbody>
+        </table>
+        """
+
+
+def send_digest(
+    matches: list[MatchResult],
+    scrape_summaries: list[ScrapeSummary] | None = None,
+    dry_run: bool = False,
+) -> bool:
     """Convenience function to send job digest."""
     sender = EmailSender()
-    return sender.send_daily_digest(matches, dry_run=dry_run)
+    return sender.send_daily_digest(matches, scrape_summaries=scrape_summaries, dry_run=dry_run)

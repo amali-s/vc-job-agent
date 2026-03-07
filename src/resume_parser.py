@@ -254,34 +254,21 @@ class ResumeParser:
             logger.warning(f"LLM extraction failed for portfolio: {e}")
 
     def _call_llm(self, prompt: str) -> Optional[str]:
-        """Call available LLM API for structured extraction."""
-        openai_key = os.environ.get("OPENAI_API_KEY")
+        """Call Anthropic Claude API for structured extraction."""
         anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
 
-        if openai_key:
-            import openai
-            client = openai.OpenAI(api_key=openai_key)
-            response = client.chat.completions.create(
-                model="gpt-4o",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=2048,
-                response_format={"type": "json_object"},
-            )
-            return response.choices[0].message.content.strip()
-
-        elif anthropic_key:
-            import anthropic
-            client = anthropic.Anthropic(api_key=anthropic_key)
-            message = client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=2048,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            return message.content[0].text.strip()
-
-        else:
-            logger.warning("No API key available for structured extraction — skipping")
+        if not anthropic_key:
+            logger.warning("ANTHROPIC_API_KEY not set — skipping structured extraction")
             return None
+
+        import anthropic
+        client = anthropic.Anthropic(api_key=anthropic_key)
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2048,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return message.content[0].text.strip()
 
     def _clean_json(self, text: str) -> str:
         """Clean potential markdown code blocks from JSON response."""

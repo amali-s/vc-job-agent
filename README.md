@@ -89,7 +89,7 @@ cp .env.example .env
 
 **Required:**
 
-- One AI API key: `ANTHROPIC_API_KEY` (Claude) or `OPENAI_API_KEY` (GPT-4o)
+- `ANTHROPIC_API_KEY` — Anthropic Claude API key for profile parsing and job matching
 - One email provider:
   - Gmail: `GMAIL_USER` + `GMAIL_APP_PASSWORD`
   - SendGrid: `SENDGRID_API_KEY` + `EMAIL_FROM`
@@ -137,7 +137,7 @@ Add these in your repository settings under Settings → Secrets → Actions:
 
 | Secret | Description |
 |--------|-------------|
-| `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` | AI API key for profile parsing and job matching |
+| `ANTHROPIC_API_KEY` | Anthropic Claude API key for profile parsing and job matching |
 | `GMAIL_USER` + `GMAIL_APP_PASSWORD` | Gmail credentials (or use SendGrid below) |
 | `SENDGRID_API_KEY` + `EMAIL_FROM` | SendGrid credentials (alternative to Gmail) |
 | `EMAIL_TO` | Your email address |
@@ -150,7 +150,7 @@ vc-job-agent/
 │   ├── main.py              # Orchestrator — scrape → filter → match → email
 │   ├── models.py            # Data models (Job, MatchResult, CandidateProfile)
 │   ├── resume_parser.py     # Resume PDF + portfolio extraction with LLM
-│   ├── matcher.py           # AI matching engine (Claude or GPT-4o)
+│   ├── matcher.py           # AI matching engine (Anthropic Claude)
 │   ├── emailer.py           # Email digest sender (Gmail or SendGrid)
 │   └── scrapers/
 │       ├── base.py          # Base scraper with location/date filters
@@ -167,7 +167,7 @@ vc-job-agent/
 
 ## Cost Estimate
 
-- **Claude/OpenAI API**: ~$0.02–0.10 per run (profile parsing + job matching)
+- **Claude API**: ~$0.02–0.10 per run (profile parsing + job matching)
 - **SendGrid**: Free tier covers 100 emails/day
 - **GitHub Actions**: Free for public repos
 

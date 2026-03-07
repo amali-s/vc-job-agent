@@ -1,4 +1,4 @@
-"""Job matching engine using Claude or OpenAI API."""
+"""Job matching engine using Anthropic Claude API."""
 
 import json
 import logging
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class JobMatcher:
-    """Matches jobs against candidate profiles using Claude or OpenAI API."""
+    """Matches jobs against candidate profiles using Anthropic Claude API."""
 
     MATCH_PROMPT = """Analyze how well this candidate matches the job posting.
 
@@ -60,22 +60,15 @@ Focus on product design, UX/UI design skills specifically.
 Only return the JSON, no other text."""
 
     def __init__(self):
-        """Initialize with available API key (OpenAI or Anthropic)."""
-        self.openai_key = os.environ.get("OPENAI_API_KEY")
+        """Initialize with Anthropic API key."""
         self.anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
 
-        if self.openai_key:
-            self.provider = "openai"
-            import openai
-            self.client = openai.OpenAI(api_key=self.openai_key)
-            logger.info("Using OpenAI API for matching")
-        elif self.anthropic_key:
-            self.provider = "anthropic"
-            import anthropic
-            self.client = anthropic.Anthropic(api_key=self.anthropic_key)
-            logger.info("Using Anthropic API for matching")
-        else:
-            raise ValueError("No API key found. Set OPENAI_API_KEY or ANTHROPIC_API_KEY")
+        if not self.anthropic_key:
+            raise ValueError("No API key found. Set ANTHROPIC_API_KEY")
+
+        import anthropic
+        self.client = anthropic.Anthropic(api_key=self.anthropic_key)
+        logger.info("Using Anthropic Claude API for matching")
 
     def calculate_match(self, job: Job, profile: CandidateProfile) -> MatchResult:
         """Calculate match score between a job and candidate profile."""
@@ -90,10 +83,7 @@ Only return the JSON, no other text."""
                 description=job.description[:8000],
             )
 
-            if self.provider == "openai":
-                response_text = self._call_openai(prompt)
-            else:
-                response_text = self._call_anthropic(prompt)
+            response_text = self._call_anthropic(prompt)
 
             # Parse JSON response
             response_text = self._clean_json_response(response_text)
@@ -124,16 +114,6 @@ Only return the JSON, no other text."""
                 match_percentage=0,
                 recommendation=f"Error: {e}",
             )
-
-    def _call_openai(self, prompt: str) -> str:
-        """Call OpenAI API."""
-        response = self.client.chat.completions.create(
-            model="gpt-4o",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=1024,
-            response_format={"type": "json_object"},
-        )
-        return response.choices[0].message.content.strip()
 
     def _call_anthropic(self, prompt: str) -> str:
         """Call Anthropic API."""
