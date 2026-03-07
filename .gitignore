@@ -48,3 +48,7 @@ htmlcov/
 
 # Keep resume (optional - remove if you want to track it)
 # data/resume.pdf
+
+# Agent runtime data (generated per-run)
+data/match_history.json
+data/scraped_jobs.json

@@ -59,6 +59,9 @@ class MatchResult:
     matched_keywords: list[str] = field(default_factory=list)
     company_bio: str = ""
     company_series: str = ""
+    rank: int = 0  # Current rank position (1-indexed)
+    rank_delta: Optional[int] = None  # Change from previous day (positive = moved up)
+    match_delta: Optional[int] = None  # Change in match % from previous day
 
     @property
     def is_good_match(self) -> bool:
@@ -75,7 +78,20 @@ class MatchResult:
             "matched_keywords": self.matched_keywords,
             "company_bio": self.company_bio,
             "company_series": self.company_series,
+            "rank": self.rank,
+            "rank_delta": self.rank_delta,
+            "match_delta": self.match_delta,
         }
+
+
+@dataclass
+class ScrapeSummary:
+    """Summary of scrape results for a single source."""
+
+    source: str
+    total: int = 0
+    new: int = 0
+    previously_seen: int = 0
 
 
 @dataclass

@@ -24,10 +24,19 @@ jobs:
           pip install -r requirements.txt
           playwright install chromium --with-deps
 
+      - name: Restore agent data cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/match_history.json
+            data/scraped_jobs.json
+          key: agent-data-${{ github.run_number }}
+          restore-keys: |
+            agent-data-
+
       - name: Run job scanner
         env:
-          # AI matching (use one)
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          # AI matching (Anthropic Claude)
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           # Email (use Gmail OR SendGrid)
           GMAIL_USER: ${{ secrets.GMAIL_USER }}
