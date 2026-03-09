@@ -85,14 +85,29 @@ def scrape_all_jobs(max_workers: int = 5) -> list[Job]:
             executor.submit(scraper.scrape): scraper for scraper in scrapers
         }
 
+        results_summary = []
         for future in as_completed(future_to_scraper):
             scraper = future_to_scraper[future]
             try:
                 jobs = future.result()
                 all_jobs.extend(jobs)
-                logger.info(f"[{scraper.name}] Completed: {len(jobs)} jobs")
+                status = f"{len(jobs)} jobs" if jobs else "0 jobs (empty)"
+                logger.info(f"[{scraper.name}] Completed: {status}")
+                results_summary.append((scraper.name, len(jobs), None))
             except Exception as e:
-                logger.error(f"[{scraper.name}] Failed: {e}")
+                logger.error(f"[{scraper.name}] Failed with exception: {e}")
+                results_summary.append((scraper.name, 0, str(e)))
+
+        # Print summary table
+        logger.info("\n--- Scraper Results Summary ---")
+        for name, count, error in sorted(results_summary, key=lambda x: x[1], reverse=True):
+            if error:
+                logger.info(f"  {name:25s} ERROR: {error[:60]}")
+            elif count == 0:
+                logger.info(f"  {name:25s} {count:4d} jobs  [NO RESULTS]")
+            else:
+                logger.info(f"  {name:25s} {count:4d} jobs  [OK]")
+        logger.info("--- End Summary ---\n")
 
     # Deduplicate jobs by URL
     seen_urls = set()
