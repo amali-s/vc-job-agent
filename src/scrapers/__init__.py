@@ -1,6 +1,7 @@
 """Job board scrapers for VC portfolio companies."""
 
 from .base import BaseScraper
+from .consider_base import ConsiderScraper
 from .getro_base import GetroScraper
 from .a16z import A16ZScraper
 from .sequoia import SequoiaScraper

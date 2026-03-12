@@ -1,10 +1,10 @@
 """Scraper for Bessemer Venture Partners (BVP) portfolio jobs."""
 
-from .getro_base import GetroScraper
+from .consider_base import ConsiderScraper
 
 
-class BVPScraper(GetroScraper):
-    """Scraper for Bessemer Venture Partners portfolio jobs.
+class BVPScraper(ConsiderScraper):
+    """Scraper for Bessemer Venture Partners portfolio jobs (Consider-powered).
 
     BVP's portfolio job board is at jobs.bvp.com (NOT www.bvp.com/jobs).
     """
@@ -12,3 +12,4 @@ class BVPScraper(GetroScraper):
     name = "Bessemer (BVP)"
     base_url = "https://jobs.bvp.com"
     jobs_url = "https://jobs.bvp.com/jobs"
+    board_id = "bessemer-ventures"
