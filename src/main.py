@@ -137,7 +137,7 @@ def enhance_jobs_with_details(jobs: list[Job], max_workers: int = 5) -> list[Job
     enhanced_count = 0
 
     # Record original description lengths before enhancement
-    original_lengths = {id(job): len(job.description) for job in jobs}
+    original_lengths = {id(job): len(job.description or "") for job in jobs}
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_job = {
@@ -149,7 +149,7 @@ def enhance_jobs_with_details(jobs: list[Job], max_workers: int = 5) -> list[Job
             original = future_to_job[future]
             try:
                 updated = future.result()
-                if len(updated.description) > original_lengths.get(id(original), 0):
+                if len(updated.description or "") > original_lengths.get(id(original), 0):
                     enhanced_count += 1
                 results.append(updated)
             except Exception as e:

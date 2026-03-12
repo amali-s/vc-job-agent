@@ -184,7 +184,7 @@ class IndexVenturesScraper(BaseScraper):
                 return None
 
             # Description: strip HTML tags
-            description = src.get("cleaned_job_description", "")
+            description = src.get("cleaned_job_description") or ""
             if description:
                 description = re.sub(r"<[^>]+>", " ", description)
                 description = self.clean_text(description)[:8000]
