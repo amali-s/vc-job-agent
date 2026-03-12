@@ -1,11 +1,12 @@
 """Scraper for Sequoia Capital portfolio jobs."""
 
-from .getro_base import GetroScraper
+from .consider_base import ConsiderScraper
 
 
-class SequoiaScraper(GetroScraper):
-    """Scraper for Sequoia portfolio jobs (Getro-powered)."""
+class SequoiaScraper(ConsiderScraper):
+    """Scraper for Sequoia portfolio jobs (Consider-powered)."""
 
     name = "Sequoia"
     base_url = "https://jobs.sequoiacap.com"
     jobs_url = "https://jobs.sequoiacap.com/jobs"
+    board_id = "sequoia-capital"

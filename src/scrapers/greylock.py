@@ -1,11 +1,12 @@
 """Scraper for Greylock portfolio jobs."""
 
-from .getro_base import GetroScraper
+from .consider_base import ConsiderScraper
 
 
-class GreylockScraper(GetroScraper):
-    """Scraper for Greylock portfolio jobs (Getro-powered)."""
+class GreylockScraper(ConsiderScraper):
+    """Scraper for Greylock portfolio jobs (Consider-powered)."""
 
     name = "Greylock"
     base_url = "https://jobs.greylock.com"
     jobs_url = "https://jobs.greylock.com/jobs"
+    board_id = "greylock-partners"

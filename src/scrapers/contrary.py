@@ -1,11 +1,12 @@
 """Scraper for Contrary portfolio jobs."""
 
-from .getro_base import GetroScraper
+from .consider_base import ConsiderScraper
 
 
-class ContraryScraper(GetroScraper):
-    """Scraper for Contrary portfolio jobs (Getro-powered)."""
+class ContraryScraper(ConsiderScraper):
+    """Scraper for Contrary portfolio jobs (Consider-powered)."""
 
     name = "Contrary"
     base_url = "https://jobs.contrary.com"
     jobs_url = "https://jobs.contrary.com/jobs"
+    board_id = "contrary"

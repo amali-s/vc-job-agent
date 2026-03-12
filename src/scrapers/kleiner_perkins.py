@@ -1,11 +1,12 @@
 """Scraper for Kleiner Perkins portfolio jobs."""
 
-from .getro_base import GetroScraper
+from .consider_base import ConsiderScraper
 
 
-class KleinerPerkinsScraper(GetroScraper):
-    """Scraper for Kleiner Perkins portfolio jobs (Getro-powered)."""
+class KleinerPerkinsScraper(ConsiderScraper):
+    """Scraper for Kleiner Perkins portfolio jobs (Consider-powered)."""
 
     name = "Kleiner Perkins"
     base_url = "https://jobs.kleinerperkins.com"
     jobs_url = "https://jobs.kleinerperkins.com/jobs"
+    board_id = "kleiner-perkins"
