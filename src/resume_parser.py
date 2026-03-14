@@ -21,9 +21,10 @@ RESUME_EXTRACTION_PROMPT = """Analyze this resume and extract structured informa
     "strengths": ["list of professional strengths, e.g. Design Systems, User Research, Cross-functional Leadership"],
     "soft_skills": ["list of soft skills, e.g. Communication, Collaboration, Mentoring, Stakeholder Management"],
     "years_of_experience": "total years of professional design experience as a string, e.g. '5 years'",
-    "products_worked_on": ["list of product types, e.g. SaaS B2B, Consumer Mobile App, E-commerce Platform"],
+    "products_worked_on": ["list of product types, e.g. SaaS B2B, Consumer Mobile App, E-commerce Platform, AI Tool, Automation Platform"],
     "team_types": ["list of team types worked in, e.g. Cross-functional product team, Design team of 5, Startup founding team"],
-    "interface_types": ["list of interface/experience types designed, e.g. Web dashboard, Mobile app, Design system, Data visualization"]
+    "interface_types": ["list of interface/platform types designed, e.g. Web dashboard, Mobile app (iOS), Mobile app (Android), Desktop application, Desktop browser app, Mobile browser app"],
+    "deliverables": ["list of specific deliverable types produced, e.g. Design system, Component library, Dashboard, Admin panel, RBAC/permissions, Data visualization, Onboarding flow, Trial/freemium experience, Settings page, Checkout flow, Landing page, Complex forms, Notification system"]
 }}
 
 Be thorough — extract everything relevant. Only return the JSON, no other text.
@@ -36,11 +37,13 @@ PORTFOLIO_EXTRACTION_PROMPT = """Analyze this portfolio website content and extr
 
 {{
     "years_of_experience": "years of experience mentioned or inferred, e.g. '6 years'",
-    "products_worked_on": ["list of product types shown in portfolio, e.g. SaaS Platform, Mobile App, Website Redesign"],
+    "products_worked_on": ["list of product types shown in portfolio, e.g. SaaS Platform, Mobile App, AI Tool, Automation Platform, B2B Enterprise"],
     "problems_solved": ["list of problem types from case studies, e.g. Improved onboarding conversion, Reduced user churn, Simplified complex workflow"],
     "design_methods": ["list of design processes and methods, e.g. User interviews, A/B testing, Design sprints, Usability testing, Journey mapping"],
     "team_types": ["list of team types collaborated with, e.g. Engineering team, Product managers, Data science, Marketing"],
     "visual_skillset": ["list of visual design skills, e.g. Typography, Illustration, Motion design, Brand identity, Icon design"],
+    "interface_types": ["list of interface/platform types shown, e.g. Web dashboard, Mobile app, Desktop application, Desktop browser app, Mobile browser app"],
+    "deliverables": ["list of specific deliverable types shown in case studies, e.g. Design system, Dashboard, RBAC/permissions, Data visualization, Onboarding flow, Trial experience, Settings page, Gantt chart, DNS management interface"],
     "goals_motivations": "goals and motivations from about/bio section, as a short summary string"
 }}
 
@@ -201,6 +204,7 @@ class ResumeParser:
             profile.products_worked_on = data.get("products_worked_on", [])
             profile.team_types = data.get("team_types", [])
             profile.interface_types = data.get("interface_types", [])
+            profile.deliverables = data.get("deliverables", [])
             logger.info("Extracted structured resume data successfully")
 
         except (json.JSONDecodeError, KeyError, TypeError) as e:
@@ -241,6 +245,22 @@ class ResumeParser:
                 if t.lower() not in existing_teams:
                     profile.team_types.append(t)
                     existing_teams.add(t.lower())
+
+            # Extend interface types from portfolio
+            portfolio_interfaces = data.get("interface_types", [])
+            existing_interfaces = set(t.lower() for t in profile.interface_types)
+            for t in portfolio_interfaces:
+                if t.lower() not in existing_interfaces:
+                    profile.interface_types.append(t)
+                    existing_interfaces.add(t.lower())
+
+            # Extend deliverables from portfolio
+            portfolio_deliverables = data.get("deliverables", [])
+            existing_deliverables = set(d.lower() for d in profile.deliverables)
+            for d in portfolio_deliverables:
+                if d.lower() not in existing_deliverables:
+                    profile.deliverables.append(d)
+                    existing_deliverables.add(d.lower())
 
             profile.problems_solved = data.get("problems_solved", [])
             profile.design_methods = data.get("design_methods", [])
