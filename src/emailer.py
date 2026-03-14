@@ -230,6 +230,21 @@ class EmailSender:
             </p>
             """
 
+        # Dimension scores breakdown
+        dimension_html = ""
+        ds = match.dimension_scores
+        if any([ds.experience, ds.work_type, ds.skills_methods, ds.product_type, ds.deliverables]):
+            dimension_html = f"""
+            <div style="margin-top: 10px; padding: 10px; background-color: #f5f5f5; border-radius: 6px;">
+                <span style="color: #888; font-size: 11px; display: block; margin-bottom: 6px;">Score Breakdown:</span>
+                {self._dimension_bar("Experience", ds.experience)}
+                {self._dimension_bar("Work Type", ds.work_type)}
+                {self._dimension_bar("Skills", ds.skills_methods)}
+                {self._dimension_bar("Product", ds.product_type)}
+                {self._dimension_bar("Deliverables", ds.deliverables)}
+            </div>
+            """
+
         # Matched keywords as inline tags
         keywords_html = ""
         if match.matched_keywords:
@@ -269,11 +284,33 @@ class EmailSender:
             {meta_html}
             {company_bio_html}
             {salary_html}
+            {dimension_html}
             {keywords_html}
 
             <a href="{job.url}" style="display: inline-block; margin-top: 16px; background-color: #1a1a1a; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-size: 14px; font-weight: 500;">
                 Apply Now →
             </a>
+        </div>
+        """
+
+    def _dimension_bar(self, label: str, score: int) -> str:
+        """Generate an inline progress bar for a dimension score."""
+        if score >= 80:
+            bar_color = "#10b981"
+        elif score >= 60:
+            bar_color = "#3b82f6"
+        elif score >= 40:
+            bar_color = "#f59e0b"
+        else:
+            bar_color = "#ef4444"
+
+        return f"""
+        <div style="display: flex; align-items: center; margin-bottom: 3px;">
+            <span style="font-size: 11px; color: #666; width: 75px; flex-shrink: 0;">{label}</span>
+            <div style="flex-grow: 1; background-color: #e5e5e5; border-radius: 3px; height: 6px; margin: 0 8px;">
+                <div style="width: {score}%; background-color: {bar_color}; border-radius: 3px; height: 6px;"></div>
+            </div>
+            <span style="font-size: 11px; color: #666; width: 28px; text-align: right; flex-shrink: 0;">{score}%</span>
         </div>
         """
 

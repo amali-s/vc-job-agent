@@ -48,11 +48,32 @@ class Job:
 
 
 @dataclass
+class DimensionScores:
+    """Individual dimension scores for job matching (0-100 each)."""
+
+    experience: int = 0  # Years of experience fit
+    work_type: int = 0  # Type of work alignment
+    skills_methods: int = 0  # Skills and methods match
+    product_type: int = 0  # Product type fit (B2B, SaaS, AI, mobile, etc.)
+    deliverables: int = 0  # Deliverables fit (design systems, dashboards, etc.)
+
+    def to_dict(self) -> dict:
+        return {
+            "experience": self.experience,
+            "work_type": self.work_type,
+            "skills_methods": self.skills_methods,
+            "product_type": self.product_type,
+            "deliverables": self.deliverables,
+        }
+
+
+@dataclass
 class MatchResult:
     """Result of matching a job against a candidate profile."""
 
     job: Job
     match_percentage: int  # 0-100
+    dimension_scores: DimensionScores = field(default_factory=DimensionScores)
     matching_skills: list[str] = field(default_factory=list)
     missing_skills: list[str] = field(default_factory=list)
     recommendation: str = ""
@@ -72,6 +93,7 @@ class MatchResult:
         return {
             "job": self.job.to_dict(),
             "match_percentage": self.match_percentage,
+            "dimension_scores": self.dimension_scores.to_dict(),
             "matching_skills": self.matching_skills,
             "missing_skills": self.missing_skills,
             "recommendation": self.recommendation,
@@ -112,6 +134,7 @@ class CandidateProfile:
     products_worked_on: list[str] = field(default_factory=list)
     team_types: list[str] = field(default_factory=list)
     interface_types: list[str] = field(default_factory=list)
+    deliverables: list[str] = field(default_factory=list)
 
     # Structured fields parsed from portfolio
     problems_solved: list[str] = field(default_factory=list)
@@ -154,6 +177,8 @@ class CandidateProfile:
             parts.append(f"Team Types: {', '.join(self.team_types)}")
         if self.interface_types:
             parts.append(f"Interface/Experience Types: {', '.join(self.interface_types)}")
+        if self.deliverables:
+            parts.append(f"Deliverables: {', '.join(self.deliverables)}")
         if self.problems_solved:
             parts.append(f"Problems Solved: {', '.join(self.problems_solved)}")
         if self.design_methods:
