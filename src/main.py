@@ -163,7 +163,7 @@ def enhance_jobs_with_details(jobs: list[Job], max_workers: int = 5) -> list[Job
 def filter_jobs(jobs: list[Job]) -> list[Job]:
     """Apply location and recency filters as a post-scrape safety net.
 
-    Filters jobs to only include those in New York, San Francisco, or Remote,
+    Filters jobs to only include those in San Francisco, New York City, or Remote (US),
     and posted within the last 30 days.
     """
     scraper = BaseScraper.__subclasses__()[0]()  # Use any scraper instance for filter methods
@@ -251,7 +251,7 @@ def run(dry_run: bool = False, min_match: int = 60, skip_details: bool = False) 
         return 0
 
     # Step 2.5: Apply post-scrape location and recency filters
-    logger.info(f"\n📍 Filtering {len(jobs)} jobs by location (NYC/SF/Remote) and recency (<30 days)...")
+    logger.info(f"\n📍 Filtering {len(jobs)} jobs by location (SF/NYC/Remote US) and recency (<30 days)...")
     jobs = filter_jobs(jobs)
 
     if not jobs:
