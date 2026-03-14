@@ -16,18 +16,23 @@ from ..models import Job
 logger = logging.getLogger(__name__)
 
 
-# Location keywords for New York and San Francisco filtering
+# Location keywords for target city filtering
 NY_KEYWORDS = [
     "new york", "nyc", "ny, ", "brooklyn", "manhattan",
     "new york city", "new york, ny",
 ]
 SF_KEYWORDS = [
-    "san francisco", "sf", "bay area", "south bay",
-    "san jose", "palo alto", "mountain view", "menlo park",
-    "sunnyvale", "cupertino", "oakland", "berkeley",
-    "san mateo", "redwood city", "santa clara",
+    "san francisco", "sf, ca", "san francisco, ca",
 ]
 REMOTE_KEYWORDS = ["remote", "anywhere", "distributed"]
+# Keywords that indicate non-US remote (used to exclude)
+NON_US_REMOTE_KEYWORDS = [
+    "remote - europe", "remote - uk", "remote - canada", "remote - apac",
+    "remote - latam", "remote - india", "remote - global",
+    "remote (europe)", "remote (uk)", "remote (canada)", "remote (apac)",
+    "remote (latam)", "remote (india)", "remote (global)",
+    "remote - emea", "remote (emea)",
+]
 
 
 class BaseScraper(ABC):
@@ -82,9 +87,9 @@ class BaseScraper(ABC):
         return any(keyword in text for keyword in self.DESIGN_KEYWORDS)
 
     def is_valid_location(self, location: str) -> bool:
-        """Check if job location is in New York, San Francisco, or Remote.
+        """Check if job location is in San Francisco, New York City, or Remote (US).
 
-        Returns True if location matches target cities or is remote.
+        Returns True if location matches target cities or is US-based remote.
         Returns True if location is empty/unknown (to avoid filtering out jobs with missing data).
         """
         if not location or location == "Not specified":
@@ -96,12 +101,14 @@ class BaseScraper(ABC):
         if any(kw in loc_lower for kw in NY_KEYWORDS):
             return True
 
-        # Check for SF / Bay Area
+        # Check for SF
         if any(kw in loc_lower for kw in SF_KEYWORDS):
             return True
 
-        # Check for remote
+        # Check for remote — must not be explicitly non-US
         if any(kw in loc_lower for kw in REMOTE_KEYWORDS):
+            if any(kw in loc_lower for kw in NON_US_REMOTE_KEYWORDS):
+                return False
             return True
 
         return False
