@@ -58,7 +58,7 @@ class ResumeParser:
 
     # Portfolio subpages to scrape for design process and work experience
     PORTFOLIO_SUBPAGES = [
-        "/about",
+        "/about-me",
         "/trial",
         "/dns-feature",
         "/cloud-details",
