@@ -46,8 +46,8 @@ Thumbs.db
 .coverage
 htmlcov/
 
-# Keep resume (optional - remove if you want to track it)
-# data/resume.pdf
+# Resume — keep private, never commit
+data/resume.pdf
 
 # Agent runtime data (generated per-run)
 data/match_history.json

@@ -56,15 +56,6 @@ PORTFOLIO CONTENT:
 class ResumeParser:
     """Parser for extracting profile information from resume PDF and portfolio website."""
 
-    # Portfolio subpages to scrape for design process and work experience
-    PORTFOLIO_SUBPAGES = [
-        "/about-me",
-        "/trial",
-        "/dns-feature",
-        "/cloud-details",
-        "/gantt-chart",
-    ]
-
     def __init__(
         self,
         resume_path: Optional[str] = None,
@@ -73,9 +64,15 @@ class ResumeParser:
         self.resume_path = resume_path or os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "data", "resume.pdf"
         )
-        self.portfolio_url = portfolio_url or os.environ.get(
-            "PORTFOLIO_URL", "https://www.amayamali.com/"
-        )
+        self.portfolio_url = portfolio_url or os.environ.get("PORTFOLIO_URL") or None
+
+        # Portfolio subpages to scrape for design process and work experience.
+        # Set PORTFOLIO_SUBPAGES env var as a comma-separated list, e.g.:
+        #   PORTFOLIO_SUBPAGES=/about,/case-study-1,/case-study-2
+        subpages_env = os.environ.get("PORTFOLIO_SUBPAGES", "")
+        self.portfolio_subpages = [
+            s.strip() for s in subpages_env.split(",") if s.strip()
+        ]
 
     def parse(self) -> CandidateProfile:
         """Parse resume and portfolio to create a candidate profile."""
@@ -137,7 +134,7 @@ class ResumeParser:
         # Build full list of URLs: main page + subpages
         base_url = self.portfolio_url.rstrip("/")
         urls_to_scrape = [self.portfolio_url]
-        for subpage in self.PORTFOLIO_SUBPAGES:
+        for subpage in self.portfolio_subpages:
             urls_to_scrape.append(f"{base_url}{subpage}")
 
         all_sections = []

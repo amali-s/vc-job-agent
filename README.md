@@ -97,7 +97,8 @@ cp .env.example .env
 
 **Optional:**
 
-- `PORTFOLIO_URL` — your portfolio website URL (defaults to `https://www.amayamali.com/`)
+- `PORTFOLIO_URL` — your portfolio website URL (skipped if not set; enables richer matching)
+- `PORTFOLIO_SUBPAGES` — comma-separated subpages to scrape, e.g. `/about,/case-study-1,/case-study-2`
 
 ### 3. Add Your Resume
 
@@ -141,6 +142,8 @@ Add these in your repository settings under Settings → Secrets → Actions:
 | `GMAIL_USER` + `GMAIL_APP_PASSWORD` | Gmail credentials (or use SendGrid below) |
 | `SENDGRID_API_KEY` + `EMAIL_FROM` | SendGrid credentials (alternative to Gmail) |
 | `EMAIL_TO` | Your email address |
+| `PORTFOLIO_URL` | *(Optional)* Your portfolio URL for richer matching |
+| `PORTFOLIO_SUBPAGES` | *(Optional)* Comma-separated subpages, e.g. `/about,/case-study-1` |
 
 ## Project Structure
 
@@ -158,7 +161,7 @@ vc-job-agent/
 │       ├── a16z.py          # Individual VC scrapers...
 │       └── ...
 ├── data/
-│   └── resume.pdf           # Your resume
+│   └── resume.pdf           # Your resume (gitignored — add your own)
 ├── .github/workflows/
 │   └── daily-job-scan.yml   # GitHub Actions automation
 ├── requirements.txt
