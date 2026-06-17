@@ -16,22 +16,15 @@ from ..models import Job
 logger = logging.getLogger(__name__)
 
 
-# Location keywords for target city filtering
+# Location keywords for target city filtering.
+# Only SF and NYC are accepted — remote and empty locations are excluded.
 NY_KEYWORDS = [
-    "new york", "nyc", "ny, ", "brooklyn", "manhattan",
-    "new york city", "new york, ny",
+    "new york", "nyc", "ny,", "brooklyn", "manhattan",
+    "new york city", "new york, ny", "new york, new york",
 ]
 SF_KEYWORDS = [
-    "san francisco", "sf, ca", "san francisco, ca",
-]
-REMOTE_KEYWORDS = ["remote", "anywhere", "distributed"]
-# Keywords that indicate non-US remote (used to exclude)
-NON_US_REMOTE_KEYWORDS = [
-    "remote - europe", "remote - uk", "remote - canada", "remote - apac",
-    "remote - latam", "remote - india", "remote - global",
-    "remote (europe)", "remote (uk)", "remote (canada)", "remote (apac)",
-    "remote (latam)", "remote (india)", "remote (global)",
-    "remote - emea", "remote (emea)",
+    "san francisco", "sf,", "sf ca", "sf, ca", "sf california",
+    "san francisco, ca", "san francisco, california",
 ]
 
 
@@ -87,28 +80,22 @@ class BaseScraper(ABC):
         return any(keyword in text for keyword in self.DESIGN_KEYWORDS)
 
     def is_valid_location(self, location: str) -> bool:
-        """Check if job location is in San Francisco, New York City, or Remote (US).
+        """Check if job location is explicitly in San Francisco or New York City.
 
-        Returns True if location matches target cities or is US-based remote.
-        Returns True if location is empty/unknown (to avoid filtering out jobs with missing data).
+        Returns True ONLY if the location clearly states SF or NYC.
+        Empty/unknown locations and remote-only jobs are filtered out.
         """
         if not location or location == "Not specified":
-            return True  # Don't filter out jobs with unknown location
+            return False  # Require an explicit location
 
-        loc_lower = location.lower()
+        loc_lower = location.lower().strip()
 
-        # Check for NY
+        # Check for NYC variants
         if any(kw in loc_lower for kw in NY_KEYWORDS):
             return True
 
-        # Check for SF
+        # Check for SF variants
         if any(kw in loc_lower for kw in SF_KEYWORDS):
-            return True
-
-        # Check for remote — must not be explicitly non-US
-        if any(kw in loc_lower for kw in REMOTE_KEYWORDS):
-            if any(kw in loc_lower for kw in NON_US_REMOTE_KEYWORDS):
-                return False
             return True
 
         return False

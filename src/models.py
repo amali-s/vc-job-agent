@@ -83,6 +83,7 @@ class MatchResult:
     rank: int = 0  # Current rank position (1-indexed)
     rank_delta: Optional[int] = None  # Change from previous day (positive = moved up)
     match_delta: Optional[int] = None  # Change in match % from previous day
+    is_b2b: bool = True  # Whether the company is B2B (False = consumer-facing, filtered out)
 
     @property
     def is_good_match(self) -> bool:
@@ -103,6 +104,7 @@ class MatchResult:
             "rank": self.rank,
             "rank_delta": self.rank_delta,
             "match_delta": self.match_delta,
+            "is_b2b": self.is_b2b,
         }
 
 
@@ -142,6 +144,9 @@ class CandidateProfile:
     visual_skillset: list[str] = field(default_factory=list)
     goals_motivations: str = ""
 
+    # Candidate bio (loaded from CANDIDATE_BIO.md)
+    bio_content: str = ""
+
     @property
     def full_profile(self) -> str:
         """Returns combined profile text for matching."""
@@ -156,6 +161,9 @@ class CandidateProfile:
         structured = self._structured_summary()
         if structured:
             sections.append("STRUCTURED PROFILE:\n" + structured)
+
+        if self.bio_content:
+            sections.append("CANDIDATE BIO (skills, experience depth, industry context):\n" + self.bio_content)
 
         return "\n\n".join(sections)
 

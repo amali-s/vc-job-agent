@@ -27,6 +27,18 @@ class JobMatcher:
 CANDIDATE PROFILE:
 {profile}
 
+KEY PORTFOLIO ATTRIBUTES TO WEIGHT IN SCORING:
+- Designed 33-chart SRE observability dashboard restructured around troubleshooting workflow → 75% customer satisfaction, -30% task completion time, 80% of customers across 3 markets requested early access
+- Designed 0→1 SaaS trial flow (IBM NS1) with onboarding tasks + smart search panel → 52% spike in signups, $200K in closed deals
+- Redesigned premium traffic-steering feature (Pulsar/IBM NS1) solo from research to handoff → +73.1% usage, 24% increase in annual customer growth
+- Top contributor to IBM Carbon Design System (500+ products); Gantt chart component; built components with 100+ external adoption requests
+- Filed 2 patents on human-AI collaboration (AI deskilling reduction, expert intervention in AI workflows)
+- Redesigned IBM seller training for remote delivery (100 → 500 students)
+- Designed and launched Responsible AI Institute website solo (5x engagement increase)
+- Built personal Sage Design System in Storybook (color, layout, type, components)
+- Built this VC job-matching AI agent (TypeScript/Python, Framer, front-end dev)
+- Design methods used: user interviews (16+), usability testing (4 rounds), low-fi → hi-fi prototyping, feasibility workshops with eng, cross-functional PM/eng/marketing collaboration, competitive audits, ethical AI assessment
+
 JOB POSTING:
 Title: {title}
 Company: {company}
@@ -49,6 +61,7 @@ Score each dimension independently from 0 to 100. Use the FULL range — do NOT 
 2. WORK TYPE (0-100): Type of work alignment.
    Does the work the candidate has done (shown in resume and portfolio) match the type of work this role involves?
    Consider: strategic vs. execution, research-heavy vs. visual-heavy, 0-to-1 vs. optimization, consumer vs. enterprise UX patterns.
+   Also consider: designing for technical users (DevOps, SRE, network engineers, developers), AI/ML product design, design system contributions.
    - 90-100: Near-identical work types
    - 70-89: Substantial overlap with minor differences
    - 40-69: Some overlap but different emphasis
@@ -56,7 +69,7 @@ Score each dimension independently from 0 to 100. Use the FULL range — do NOT 
 
 3. SKILLS & METHODS (0-100): Skills, tools, and methods match.
    Does the candidate use the specific skills, tools, and design methods the job requires?
-   Compare: design tools (Figma, Sketch, etc.), research methods (user interviews, usability testing, A/B testing), processes (design sprints, design thinking, agile), technical skills (prototyping, HTML/CSS, data analysis).
+   Compare: design tools (Figma, Sketch, Framer, etc.), research methods (user interviews, usability testing, A/B testing), processes (design sprints, design thinking, agile), technical skills (prototyping, front-end dev, TypeScript, data visualization).
    - 90-100: Has nearly all required skills and methods
    - 70-89: Has most required skills, missing 1-2 minor ones
    - 40-69: Has some required skills but missing several important ones
@@ -64,8 +77,9 @@ Score each dimension independently from 0 to 100. Use the FULL range — do NOT 
 
 4. PRODUCT TYPE (0-100): Product type and platform fit.
    Does the candidate's experience with product types match what this company builds?
-   Product types: B2B, B2C, SaaS, marketplace, automation, AI/ML, developer tools, fintech, healthtech, etc.
-   Platform types: mobile apps (iOS/Android), desktop applications, web applications (desktop browser), mobile web, cross-platform.
+   Product types: B2B SaaS, enterprise software, developer tools, AI/ML products, infrastructure/DevOps, networking software, automation platforms, etc.
+   Platform types: web dashboards (desktop browser), mobile apps, desktop applications, cross-platform.
+   The candidate's primary experience is: B2B enterprise SaaS (web dashboard), DevOps/networking tools, AI/ML products, design systems.
    - 90-100: Same product type AND platform
    - 70-89: Same product type OR same platform with related product type
    - 40-69: Related but not matching product or platform type
@@ -73,7 +87,7 @@ Score each dimension independently from 0 to 100. Use the FULL range — do NOT 
 
 5. DELIVERABLES (0-100): Deliverables and output fit.
    Does the candidate's portfolio show the types of deliverables this role requires?
-   Deliverable types: design systems, component libraries, dashboards, admin panels, RBAC/permissions, data visualizations, onboarding flows, trial/freemium experiences, settings/configuration pages, checkout flows, landing pages, mobile interfaces, complex forms, notification systems.
+   Deliverable types: observability dashboards, data visualizations, SaaS trial/onboarding flows, design systems, component libraries, admin panels, RBAC/permissions, DNS/network management interfaces, traffic steering UIs, AI-assisted workflows, Gantt charts, mobile interfaces, complex forms.
    - 90-100: Portfolio shows nearly identical deliverable types
    - 70-89: Portfolio shows most of the relevant deliverable types
    - 40-69: Portfolio shows some related deliverables
@@ -85,11 +99,18 @@ IMPORTANT RULES:
 - If the job posting lacks info for a dimension (e.g., no years mentioned), score based on what you can reasonably infer from the role level and description.
 - Prioritize the Qualifications/Requirements section for skills and experience evidence.
 - Focus on product design, UX/UI design skills specifically.
+- Weight the portfolio case study outcomes heavily — quantified impact (75% CSAT, 73% usage spike, 52% signup spike) signals strong execution ability.
 
 Also extract:
 - A 1-2 sentence company bio from the Company Description field (or infer from job description)
 - The company's funding series if mentioned (e.g. "Series A", "Series B", "Public")
 - Specific keywords from the job posting that matched the candidate's profile
+- Whether the company is B2B (sells to businesses) or B2C/consumer-facing (sells to individuals/consumers)
+
+B2B classification guidance:
+- B2B = sells primarily to businesses, enterprises, teams, or developers (SaaS, infrastructure, dev tools, enterprise software, APIs, etc.)
+- Consumer = sells primarily to individual consumers (social apps, consumer marketplace, entertainment, retail, gaming, etc.)
+- Mixed B2B/B2C companies: classify as B2B only if the majority of revenue/users are business customers
 
 Return this exact JSON structure:
 {{
@@ -105,6 +126,7 @@ Return this exact JSON structure:
     "matched_keywords": ["keyword or phrase from job posting", ...],
     "company_bio": "<1-2 sentence company description>",
     "company_series": "<funding series or empty string>",
+    "is_b2b": <true if B2B company, false if consumer-facing>,
     "recommendation": "<2-3 sentence explanation citing which dimensions scored high/low and why>"
 }}
 
@@ -163,6 +185,7 @@ Only return the JSON, no other text."""
                 matched_keywords=result.get("matched_keywords", []),
                 company_bio=result.get("company_bio", ""),
                 company_series=result.get("company_series", ""),
+                is_b2b=result.get("is_b2b", True),
             )
 
         except json.JSONDecodeError as e:
@@ -226,9 +249,15 @@ Only return the JSON, no other text."""
 
             logger.info(f"  Match: {result.match_percentage}%")
 
+        # Filter out consumer-facing companies
+        b2b_results = [r for r in results if r.is_b2b]
+        consumer_count = len(results) - len(b2b_results)
+        if consumer_count:
+            logger.info(f"Filtered out {consumer_count} consumer-facing companies")
+
         # Filter to good matches and sort by match percentage
-        good_matches = [r for r in results if r.match_percentage >= min_match]
+        good_matches = [r for r in b2b_results if r.match_percentage >= min_match]
         good_matches.sort(key=lambda r: r.match_percentage, reverse=True)
 
-        logger.info(f"Found {len(good_matches)} jobs matching >= {min_match}%")
+        logger.info(f"Found {len(good_matches)} B2B jobs matching >= {min_match}%")
         return good_matches

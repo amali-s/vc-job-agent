@@ -60,11 +60,15 @@ class ResumeParser:
         self,
         resume_path: Optional[str] = None,
         portfolio_url: Optional[str] = None,
+        bio_path: Optional[str] = None,
     ):
         self.resume_path = resume_path or os.path.join(
             os.path.dirname(os.path.dirname(__file__)), "data", "resume.pdf"
         )
         self.portfolio_url = portfolio_url or os.environ.get("PORTFOLIO_URL") or None
+        self.bio_path = bio_path or os.path.join(
+            os.path.dirname(os.path.dirname(__file__)), "CANDIDATE_BIO.md"
+        )
 
         # Portfolio subpages to scrape for design process and work experience.
         # Set PORTFOLIO_SUBPAGES env var as a comma-separated list, e.g.:
@@ -75,13 +79,15 @@ class ResumeParser:
         ]
 
     def parse(self) -> CandidateProfile:
-        """Parse resume and portfolio to create a candidate profile."""
+        """Parse resume, portfolio, and candidate bio to create a candidate profile."""
         resume_text = self._parse_resume()
         portfolio_content = self._scrape_portfolio()
+        bio_content = self._load_bio()
 
         profile = CandidateProfile(
             resume_text=resume_text,
             portfolio_content=portfolio_content,
+            bio_content=bio_content,
         )
 
         # Extract structured data using LLM
@@ -89,6 +95,20 @@ class ResumeParser:
         self._extract_structured_portfolio(profile)
 
         return profile
+
+    def _load_bio(self) -> str:
+        """Load candidate bio from CANDIDATE_BIO.md if present."""
+        if not self.bio_path or not os.path.exists(self.bio_path):
+            logger.info("No CANDIDATE_BIO.md found — skipping bio")
+            return ""
+        try:
+            with open(self.bio_path, "r", encoding="utf-8") as f:
+                content = f.read()
+            logger.info(f"Loaded candidate bio ({len(content)} characters)")
+            return content
+        except Exception as e:
+            logger.warning(f"Could not load candidate bio: {e}")
+            return ""
 
     def _parse_resume(self) -> str:
         """Extract text from resume PDF."""
