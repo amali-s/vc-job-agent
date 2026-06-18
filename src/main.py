@@ -206,7 +206,7 @@ def run(dry_run: bool = False, min_match: int = 60, skip_details: bool = False) 
     logger.info("\n📄 Parsing resume and portfolio...")
     try:
         profile = get_profile()
-        if not profile.resume_text and not profile.portfolio_content:
+        if not profile.resume_text and not profile.portfolio_content and not profile.bio_content:
             logger.warning("No profile content found. Add resume.pdf to data/ folder.")
         else:
             logger.info(f"Profile loaded: {len(profile.full_profile)} characters")
@@ -270,7 +270,7 @@ def run(dry_run: bool = False, min_match: int = 60, skip_details: bool = False) 
     # Step 3: Match new jobs against profile
     logger.info(f"\n🎯 Matching {len(jobs)} new jobs against profile...")
 
-    if profile and (profile.resume_text or profile.portfolio_content):
+    if profile and (profile.resume_text or profile.portfolio_content or profile.bio_content):
         try:
             matcher = JobMatcher()
             matches = matcher.match_jobs(jobs, profile, min_match=min_match)

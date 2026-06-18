@@ -34,6 +34,13 @@ jobs:
           restore-keys: |
             agent-data-
 
+      - name: Decode resume
+        if: ${{ secrets.RESUME_PDF_BASE64 != '' }}
+        run: |
+          mkdir -p data
+          echo "${{ secrets.RESUME_PDF_BASE64 }}" | base64 --decode > data/resume.pdf
+          echo "Resume decoded ($(wc -c < data/resume.pdf) bytes)"
+
       - name: Run job scanner
         env:
           # AI matching (Anthropic Claude)
