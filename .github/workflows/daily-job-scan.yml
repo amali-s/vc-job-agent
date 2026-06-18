@@ -35,10 +35,15 @@ jobs:
             agent-data-
 
       - name: Decode resume
-        if: ${{ secrets.RESUME_PDF_BASE64 != '' }}
+        env:
+          RESUME_PDF_BASE64: ${{ secrets.RESUME_PDF_BASE64 }}
         run: |
+          if [ -z "$RESUME_PDF_BASE64" ]; then
+            echo "No RESUME_PDF_BASE64 secret set, skipping resume decode"
+            exit 0
+          fi
           mkdir -p data
-          echo "${{ secrets.RESUME_PDF_BASE64 }}" | base64 --decode > data/resume.pdf
+          echo "$RESUME_PDF_BASE64" | base64 --decode > data/resume.pdf
           echo "Resume decoded ($(wc -c < data/resume.pdf) bytes)"
 
       - name: Run job scanner
