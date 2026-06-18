@@ -149,21 +149,24 @@ class CandidateProfile:
 
     @property
     def full_profile(self) -> str:
-        """Returns combined profile text for matching."""
+        """Returns combined profile text for matching.
+
+        Ordered highest-signal first so the most distilled content survives
+        downstream character caps (e.g. matcher truncates to 10k chars).
+        """
         sections = []
+
+        if self.bio_content:
+            sections.append("CANDIDATE BIO (skills, experience depth, industry context):\n" + self.bio_content)
+
+        structured = self._structured_summary()
+        if structured:
+            sections.append("STRUCTURED PROFILE:\n" + structured)
 
         sections.append("RESUME:\n" + self.resume_text)
 
         if self.portfolio_content:
             sections.append("PORTFOLIO:\n" + self.portfolio_content)
-
-        # Append structured data if available
-        structured = self._structured_summary()
-        if structured:
-            sections.append("STRUCTURED PROFILE:\n" + structured)
-
-        if self.bio_content:
-            sections.append("CANDIDATE BIO (skills, experience depth, industry context):\n" + self.bio_content)
 
         return "\n\n".join(sections)
 
