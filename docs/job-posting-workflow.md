@@ -131,7 +131,7 @@ How the VC Job Agent processes a single job posting, from discovery to match sco
    ▼
 10. LLM EVALUATION (Anthropic Claude API)
     │
-    │  Model: claude-sonnet-4-20250514
+    │  Model: claude-sonnet-4-6
     │  Max tokens: 1024
     │
     │  Evaluation dimensions:
